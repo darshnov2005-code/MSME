@@ -14,7 +14,7 @@
 <div class="controls" style="margin-top:13px"><div class="field"><label>Financial year end</label><input id="fyEnd" type="date" value="2026-03-31"></div><div class="field"><label>Default credit period (days)</label><input id="credit" type="number" min="0" value="45"></div><div class="field"><label>Interest rate (% p.a.)</label><input id="rate" type="number" min="0" step=".01" value="15"></div><div class="field"><label>Payment rule</label><select id="rule"><option value="positive">Positive amount = payment</option><option value="pnb">Text contains PUNJAB NATIONAL BANK</option><option value="either">Positive amount OR PNB text</option></select></div><button id="run" class="btn primary">Run Audit Analysis</button></div>
 <div class="note"><b>Matching:</b> FIFO within each party. The raw SAP rows remain untouched. Payments are allocated against the oldest open debit/invoice first. Only amounts outstanding at the selected FY end are considered for the potential 43B(h) figure.</div></section>
 
-<section id="clause22" class="card hidden"><h2>Form 3CD — Clause 22 Summary</h2><p class="sub">Four disclosure figures required for MSMED reporting.</p><div class="grid">
+<section id="clause22" class="card"><h2>Form 3CD — Clause 22 Summary</h2><p class="sub">Four disclosure figures required for MSMED reporting.</p><div class="grid">
 <div class="stat"><small>22(i) Interest inadmissible u/s 23</small><b id="c22a">₹0</b></div>
 <div class="stat"><small>22(ii) Amount required to be paid</small><b id="c22req">₹0</b></div>
 <div class="stat"><small>22(iii)(a) Paid within Section 15 time</small><b id="c22paid">₹0</b></div>
@@ -26,7 +26,10 @@
 <tr><td><b>22(ii)</b></td><td>Total amount required to be paid to a Micro or Small Enterprise during the previous year</td><td id="c22req2">₹0</td><td>Invoices / liabilities whose Section 15 due date falls in the selected FY</td><td><select><option>Pending review</option><option>Accepted</option><option>Manually adjusted</option></select></td></tr>
 <tr><td><b>22(iii)(a)</b></td><td>Of (ii), amount paid up to the time given under section 15</td><td id="c22paid2">₹0</td><td>Allocated payment made on or before statutory due date</td><td><select><option>Pending review</option><option>Accepted</option><option>Manually adjusted</option></select></td></tr>
 <tr><td><b>22(iii)(b)</b></td><td>Of (ii), amount not paid up to the time given under section 15 and inadmissible for the previous year</td><td id="c22not2">₹0</td><td>Amount remaining unpaid after statutory due date</td><td><select id="review22b"><option>Pending review</option><option>Accepted</option><option>Not applicable</option><option>Manually adjusted</option></select></td></tr>
-</tbody></table></div></section><section id="dash" class="hidden"><div class="grid">
+</tbody></table></div>
+<div style="margin-top:16px"><div class="controls"><div class="field" style="max-width:260px"><label>Clause 22 entry filter</label><select id="c22Filter"><option value="disallowed">Disallowed / delayed</option><option value="all">All Clause 22 entries</option><option value="within">Paid within Section 15 time</option></select></div></div>
+<div class="table" style="margin-top:10px"><table><thead><tr><th>Party</th><th>Invoice Doc</th><th>Invoice Amount</th><th>Section 15 Due Date</th><th>Paid by Due Date</th><th>Amount Disallowed</th><th>Reason</th></tr></thead><tbody id="c22Entries"></tbody></table></div></div>
+</section><section id="dash" class="hidden"><div class="grid">
 <div class="stat"><small>Transactions</small><b id="n">0</b></div><div class="stat"><small>Parties</small><b id="parties">0</b></div><div class="stat"><small>Invoices / Debits</small><b id="invoices">0</b></div><div class="stat"><small>Payments</small><b id="payments">0</b></div><div class="stat"><small>Paid After Due Date</small><b id="late">₹0</b></div><div class="stat"><small>Outstanding At FY End</small><b id="out">₹0</b></div><div class="stat"><small>Estimated MSMED Interest</small><b id="interest">₹0</b></div><div class="stat"><small>Potential 43B(h)</small><b id="b43">₹0</b></div></div>
 
 <section class="card" style="margin-top:16px"><div class="tabs"><button class="tab active" data-tab="exceptions">Exceptions</button><button class="tab" data-tab="vendors">Party Summary</button><button class="tab" data-tab="raw">Matched Detail</button></div>
@@ -51,9 +54,26 @@ $('c22a').textContent=money(interest);$('c22a2').textContent=money(interest);
 $('c22req').textContent=money(required);$('c22req2').textContent=money(required);
 $('c22paid').textContent=money(paidWithin);$('c22paid2').textContent=money(paidWithin);
 $('c22not').textContent=money(notPaid);$('c22not2').textContent=money(notPaid);
+renderClause22Entries(clauseItems);
 $('exbody').innerHTML=result.filter(x=>x.delay>0||x.fyBal>0).sort((a,b)=>b.delay-a.delay).map((x,i)=>'<tr><td>'+esc(x.party)+'</td><td>'+fdt(x.doc)+'</td><td>'+money(Math.abs(x.invoice))+'</td><td>'+fdt(x.due)+'</td><td>'+money(x.paid)+'</td><td>'+fdt(x.pay)+'</td><td>'+x.delay+' d</td><td>'+money(x.interest)+'</td><td>'+money(x.fyBal)+'</td><td><button class="btn soft review" data-i="'+i+'">Review</button></td></tr>').join('')||'<tr><td colspan="10">No exceptions.</td></tr>';
 let vs={};result.forEach(x=>{let v=vs[x.party]??={inv:0,pay:0,late:0,out:0,int:0};v.inv+=Math.abs(x.invoice);v.pay+=x.paid;v.late+=x.delay>0?x.paid:0;v.out+=x.fyBal;v.int+=x.interest});$('vbody').innerHTML=Object.entries(vs).map(([p,v])=>'<tr><td>'+esc(p)+'</td><td>'+money(v.inv)+'</td><td>'+money(v.pay)+'</td><td>'+money(v.late)+'</td><td>'+money(v.out)+'</td><td>'+money(v.int)+'</td><td><button class="btn soft">Review</button></td></tr>').join('');
 $('rbody').innerHTML=result.map(x=>'<tr><td>'+esc(x.party)+'</td><td>'+fdt(x.doc)+'</td><td>'+money(Math.abs(x.invoice))+'</td><td>'+fdt(x.due)+'</td><td>'+fdt(x.pay)+'</td><td>'+money(x.paid)+'</td><td>'+x.delay+' d</td><td>'+money(x.interest)+'</td><td>'+money(x.fyBal)+'</td><td><span class="pill '+(x.fyBal?'p-red':x.delay?'p-amber':'p-green')+'">'+x.status+'</span></td></tr>').join('')}
+document.getElementById('c22Filter')?.addEventListener('change',()=>renderClause22Entries(result.filter(x=>x.due&&x.due<=dt($('fyEnd').value))));
+function renderClause22Entries(items){
+ const mode=$('c22Filter')?.value||'disallowed';
+ const byInvoice={};
+ items.forEach(x=>{
+   const key=x.party+'|'+(x.doc?x.doc.getTime():'')+'|'+Math.abs(x.invoice);
+   if(!byInvoice[key])byInvoice[key]={party:x.party,doc:x.doc,due:x.due,invoice:Math.abs(x.invoice),paidByDue:0,disallowed:0,late:false};
+   if(x.paid>0 && x.pay && x.due && x.pay<=x.due) byInvoice[key].paidByDue+=x.paid;
+   if(x.delay>0){byInvoice[key].late=true}
+ });
+ Object.values(byInvoice).forEach(v=>v.disallowed=Math.max(0,v.invoice-v.paidByDue));
+ let arr=Object.values(byInvoice);
+ if(mode==='disallowed') arr=arr.filter(v=>v.disallowed>0);
+ if(mode==='within') arr=arr.filter(v=>v.disallowed<=0);
+ $('c22Entries').innerHTML=arr.map(v=>'<tr><td>'+esc(v.party)+'</td><td>'+fdt(v.doc)+'</td><td>'+money(v.invoice)+'</td><td>'+fdt(v.due)+'</td><td>'+money(v.paidByDue)+'</td><td>'+money(v.disallowed)+'</td><td><span class="pill '+(v.disallowed>0?'p-red':'p-green')+'">'+(v.disallowed>0?'Not paid within Section 15 time':'Paid within Section 15 time')+'</span></td></tr>').join('')||'<tr><td colspan="7">No entries match this filter.</td></tr>';
+}
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');['exceptions','vendors','raw'].forEach(id=>$(id).classList.toggle('hidden',id!==b.dataset.tab))});
 $('run').onclick=analyse;
 $('export').onclick=()=>{if(!result.length){alert('Run analysis first.');return}let a=[['Party','Invoice Doc Date','Invoice Amount','Due Date','Payment Date','Allocated Payment','Delay Days','Interest','FY-end Outstanding','Status'],...result.map(x=>[x.party,fdt(x.doc),Math.abs(x.invoice),fdt(x.due),fdt(x.pay),x.paid,x.delay,x.interest,x.fyBal,x.status])];let c=a.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\n'),z=document.createElement('a');z.href=URL.createObjectURL(new Blob([c],{type:'text/csv'}));z.download='MSME_43Bh_Working_Paper.csv';z.click()};
