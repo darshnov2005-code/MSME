@@ -1,7 +1,11 @@
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MSME AuditCheck</title><style>
 :root{--bg:#f5f7fb;--card:#fff;--text:#172033;--muted:#667085;--line:#e4e7ec;--blue:#315efb;--green:#087f5b;--amber:#a15c00;--red:#c62828}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px Inter,Arial,sans-serif}.wrap{max-width:1400px;margin:auto;padding:26px}.top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:22px}h1{margin:0;font-size:28px}.sub{color:var(--muted);margin-top:5px}.actions{display:flex;gap:8px;flex-wrap:wrap}.btn{border:0;border-radius:9px;padding:10px 14px;font-weight:700;cursor:pointer}.primary{background:var(--blue);color:#fff}.soft{background:#edf1ff;color:#2948b8}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.stat{border:1px solid var(--line);border-radius:11px;padding:14px;background:#fff}.stat small{color:var(--muted);text-transform:uppercase;font-size:10px;font-weight:800}.stat b{display:block;font-size:23px;margin-top:7px}.controls{display:flex;gap:12px;align-items:end;flex-wrap:wrap}.field{display:flex;flex-direction:column;gap:6px;min-width:165px;flex:1}label{font-size:12px;font-weight:800}input,select{height:40px;border:1px solid #d0d5dd;border-radius:8px;background:#fff;padding:0 10px;font-size:14px}.drop{border:2px dashed #cbd3e1;border-radius:12px;padding:26px;text-align:center;background:#fafbff}.note{background:#f0f4ff;border-left:4px solid var(--blue);padding:11px;margin-top:13px;color:#445}.hidden{display:none}.tabs{display:flex;gap:5px;border-bottom:1px solid var(--line);margin-bottom:14px}.tab{padding:9px 13px;border:0;background:none;cursor:pointer;font-weight:700;color:var(--muted)}.tab.active{color:var(--blue);border-bottom:2px solid var(--blue)}.table{overflow:auto;max-height:520px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}th{position:sticky;top:0;background:#fafafa;z-index:1}.pill{padding:4px 7px;border-radius:999px;font-size:10px;font-weight:800}.p-red{background:#feeceb;color:var(--red)}.p-amber{background:#fff3dc;color:var(--amber)}.p-green{background:#e6f7ef;color:var(--green)}.review{min-width:120px}.footer{color:var(--muted);font-size:11px;margin-top:14px}@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}.top{flex-direction:column}}@media(max-width:600px){.grid{grid-template-columns:1fr 1fr}.wrap{padding:14px}}
 </style></head><body><main class="wrap">
-<header class="top"><div><h1>MSME AuditCheck</h1><div class="sub">SAP ledger → payment matching → MSMED delay analysis → 43B(h) working paper</div></div><div class="actions"><button class="btn soft" id="sample">Load Sample</button><button class="btn soft" id="export">Export Working Paper</button></div></header>
+<header class="top"><div><h1>MSME AuditCheck</h1><div class="sub">Multi-entity SAP ledger → payment matching → MSMED delay analysis → 43B(h) working paper</div></div><div class="actions"><button class="btn soft" id="sample">Load Sample</button><button class="btn soft" id="export">Export Working Paper</button></div></header>
+<section class="card"><h2>Audit Portfolio</h2><div class="controls">
+<div class="field"><label>Entity</label><select id="entity"></select></div><button class="btn primary" id="addEntity">+ Add Entity</button>
+<div class="field"><label>Financial year</label><select id="entityFY"><option>2025-26</option><option>2024-25</option><option>2026-27</option></select></div>
+</div><div class="table" style="margin-top:14px"><table><thead><tr><th>Entity</th><th>FY</th><th>Status</th><th>Transactions</th><th>Exceptions</th><th>Potential 43B(h)</th></tr></thead><tbody id="entityBody"></tbody></table></div></section>
 
 <section class="card"><h2>1. Upload SAP Excel / CSV</h2><div class="drop"><input id="file" type="file" accept=".csv,.txt,.xlsx,.xls"><div id="status" class="sub" style="margin-top:9px">Excel support is enabled when the workbook is saved as CSV; native XLSX parsing is planned for the next connector build.</div></div></section>
 
@@ -33,4 +37,24 @@ $('rbody').innerHTML=result.map(x=>'<tr><td>'+esc(x.party)+'</td><td>'+fdt(x.doc
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');['exceptions','vendors','raw'].forEach(id=>$(id).classList.toggle('hidden',id!==b.dataset.tab))});
 $('run').onclick=analyse;
 $('export').onclick=()=>{if(!result.length){alert('Run analysis first.');return}let a=[['Party','Invoice Doc Date','Invoice Amount','Due Date','Payment Date','Allocated Payment','Delay Days','Interest','FY-end Outstanding','Status'],...result.map(x=>[x.party,fdt(x.doc),Math.abs(x.invoice),fdt(x.due),fdt(x.pay),x.paid,x.delay,x.interest,x.fyBal,x.status])];let c=a.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\n'),z=document.createElement('a');z.href=URL.createObjectURL(new Blob([c],{type:'text/csv'}));z.download='MSME_43Bh_Working_Paper.csv';z.click()};
-</script></body></html>
+
+<script>
+(function(){
+const KEY='msmeAuditEntities_v1'; let entities=JSON.parse(localStorage.getItem(KEY)||'[]'); let currentEntity=null;
+function save(){localStorage.setItem(KEY,JSON.stringify(entities))}
+function refreshEntities(){
+ const s=document.getElementById('entity'); if(!s)return;
+ s.innerHTML=entities.length?entities.map(e=>'<option value="'+e.id+'">'+esc(e.name)+' — '+esc(e.fy)+'</option>').join(''):'<option value="">No entities yet</option>';
+ const b=document.getElementById('entityBody');
+ b.innerHTML=entities.length?entities.map(e=>'<tr><td>'+esc(e.name)+'</td><td>'+esc(e.fy)+'</td><td><span class="pill '+(e.status==='Completed'?'p-green':e.status==='In Review'?'p-amber':'p-red')+'">'+e.status+'</span></td><td>'+e.transactions+'</td><td>'+e.exceptions+'</td><td>'+money(e.b43)+'</td></tr>').join(''):'<tr><td colspan="6">Add your first entity to begin.</td></tr>';
+}
+document.getElementById('addEntity').onclick=function(){
+ const name=prompt('Enter entity / client name'); if(!name||!name.trim())return;
+ const fy=document.getElementById('entityFY').value;
+ const e={id:Date.now().toString(),name:name.trim(),fy,status:'Not Started',transactions:0,exceptions:0,b43:0,settings:{credit:45,rate:15,rule:'positive'}};
+ entities.push(e);currentEntity=e.id;save();refreshEntities();document.getElementById('entity').value=e.id;
+};
+document.getElementById('entity').onchange=function(){currentEntity=this.value};
+const oldAnalyse=window.analyse;
+})();
+</script></script></body></html>
